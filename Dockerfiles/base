@@ -1,0 +1,65 @@
+FROM amazonlinux:2 AS base-satge 
+
+# パッケージアップデート
+RUN yum update -y
+
+# 日本語化
+RUN yum install -y glibc-langpack-ja && yum clean all && \
+    unlink /etc/localtime && \
+    ln -s /usr/share/zoneinfo/Japan /etc/localtime 
+
+# 環境変数の設定
+ENV LANG ja_JP.UTF-8
+ENV LC_ALL ja_JP.UTF-8
+
+# Apache2.4とPHP8.0のインストール
+RUN amazon-linux-extras install -y php8.0 && \
+    yum -y install \
+        httpd && \
+    yum install -y unzip && \
+    yum install -y php \
+        php-cli \
+        php-common \
+        php-devel \
+        php-intl \
+        php-mcrypt \
+        php-pdo \
+        php-mbstring \
+        php-mysqlnd \
+        php-pecl-apcu \
+        php-opcache \
+        php-pecl-zip \
+        php-pear \
+        php-process \
+        php-xml \
+        php-json \
+        php-gd \
+        php-bcmath \ 
+        yum clean all && \
+    # PHPの設定変更
+    sed -i.bak -e '/^;date.timezone =.*/c date.timezone = Asia\/Tokyo'  \
+        -e '/display_errors =.*/c display_errors = Off'  \
+        -e '/^expose_php = .*$/c expose_php = Off'  \
+        -e '/^;error_log = .*$/c error_log = /dev/stderr' \
+        -e '/^error_reporting = .*$/c error_reporting = E_ALL & ~E_DEPRECATED & ~E_NOTICE' \
+        -e '/^post_max_size =.*/c post_max_size = 128M'  \
+        -e '/^upload_max_filesize =.*/c upload_max_filesize = 128M'  \
+        -e '/^;mbstring.language =.*/c mbstring.language = Japanese' \
+        -e '/^;mbstring.internal_encoding =.*/c mbstring.internal_encoding = UTF-8' \
+        -e '/^;mbstring.http_input =.*/c mbstring.http_input = pass'  \
+        -e '/^;mbstring.http_output =.*/c mbstring.http_output = pass' \
+        -e '/^memory_limit =.*/c memory_limit = 1024M' \
+        /etc/php.ini
+
+# PHP Composerのセットアップ
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
+    php -f composer-setup.php && \
+    php -r "unlink('composer-setup.php');" && \
+    mv composer.phar /usr/local/bin/composer
+ENV COMPOSER_ALLOW_SUPERUSER 1
+ENV COMPOSER_HOME /composer
+ENV PATH $PATH:/composer/vendor/bin
+
+# ワーキングディレクトリの設定
+WORKDIR /var/www/
+

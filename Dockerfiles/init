@@ -1,0 +1,40 @@
+FROM centos7-php80-base-projectname:latest 
+
+ARG ENV_STAGE
+
+# Composerプラグインインストール
+RUN composer global require hirak/prestissimo
+
+# Apacheの設定ファイルをコピー
+COPY conf/init/httpd.conf /etc/httpd/conf/httpd.conf
+
+# 起動スクリプトをコピー
+COPY conf/init/startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
+
+# アプリケーションファイルをコピー
+COPY webapp /var/www/webapp
+
+WORKDIR /var/www/webapp/
+
+# Composerインストール
+RUN composer install --verbose --no-progress --no-interaction --no-suggest --no-dev
+
+# Nodeインストール
+RUN curl -sL https://rpm.nodesource.com/setup_10.x | bash -
+RUN yum install -y nodejs
+
+# npmインストール
+RUN npm install
+
+# 環境変数の設定
+RUN npm run prod
+
+# Laravelの設定ファイルをコピー
+RUN cp .env.${ENV_STAGE} .env && \
+    chown -R 48:48 /var/www/webapp && \
+    php artisan key:generate
+
+CMD ["/usr/local/bin/startup.sh"]
+# Apacheをフォアグランドで起動する場合は以下の行を使います
+#CMD ["/usr/sbin/httpd","-D","FOREGROUND"]

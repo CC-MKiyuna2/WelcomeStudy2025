@@ -1,0 +1,68 @@
+version: "3"
+volumes:
+  mysql_data:
+    driver: local
+services:
+  proxy:
+    container_name: nginx-proxy
+    image: nginx:latest
+    platform: linux/amd64
+    volumes:
+      - ./nginx-proxy/conf.d:/etc/nginx/conf.d/
+    ports:
+      - 80:80
+    links:
+      - webserver
+      - phpmyadmin
+  webserver:
+    container_name: webserver
+    image: centos7-php80-webserver-projectname:latest
+    volumes:
+      - ./container_root/webapp:/var/www/webapp
+      # 証明書設定
+      - ./container_root/conf/develop/server.crt:/etc/httpd/ssl/server.crt
+      - ./container_root/conf/develop/server.csr:/etc/httpd/ssl/server.csr
+      - ./container_root/conf/develop/server.key:/etc/httpd/ssl/server.key
+    ports:
+      - 8082:80
+      - 443:443
+    environment:
+      - ENV=local
+      - LOG_CHANNEL=stdout
+      - DB_MASTER_HOST=mysql
+      - DB_SLAVE_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=appdb
+      - DB_USERNAME=appuser
+      - DB_PASSWORD=password
+      - SESSION_DRIVER=database
+    links:
+      - mysql
+  mysql:
+    container_name: mysql
+    image: mysql:5.7
+    platform: linux/amd64
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/conf.d/:/etc/mysql/conf.d
+    ports:
+      - "3306:3306"
+    environment:
+      - LANG=C.UTF-8
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=appdb
+      - MYSQL_USER=appuser
+      - MYSQL_PASSWORD=password
+  phpmyadmin:
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    platform: linux/amd64
+    ports:
+      - '18080:80'
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=mysql
+      - PMA_USER=appuser
+      - PMA_PASSWORD=password
+    links:
+      - mysql
