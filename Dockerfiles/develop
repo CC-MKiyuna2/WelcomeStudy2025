@@ -1,0 +1,46 @@
+# PHP 8.2を使用するベースイメージに変更
+FROM php:8.2-apache
+
+# 開発ツールのインストール
+RUN apt-get update && apt-get install -y \
+    awscli procps telnet wget git vim unzip \
+    libzip-dev zip \
+    && docker-php-ext-install pdo_mysql zip
+
+# Composerインストール
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# httpd.confとstartup.shのコピー
+COPY conf/develop/httpd.conf /etc/apache2/sites-available/000-default.conf
+COPY conf/develop/startup.sh /usr/local/bin/startup.sh
+
+# startup.shの実行権限付与
+RUN chmod +x /usr/local/bin/startup.sh
+
+# webappディレクトリのコピー
+COPY webapp /var/www/webapp
+
+# 作業ディレクトリをwebappに変更
+WORKDIR /var/www/webapp/
+
+# LaravelのComposer依存関係をインストール
+RUN composer install --no-dev --optimize-autoloader
+
+# Node.jsとnpmのインストール
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs
+
+# npm依存関係のインストール
+RUN npm install
+
+# 環境変数の設定とLaravelキー生成
+RUN cp .env.example .env && php artisan key:generate
+
+# PHPのメモリ制限の変更
+RUN cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini
+RUN sed -i 's/memory_limit = .*/memory_limit = 1024M/' /usr/local/etc/php/php.ini
+
+RUN a2enmod rewrite
+
+# startup.shの実行
+CMD ["/usr/local/bin/startup.sh"]

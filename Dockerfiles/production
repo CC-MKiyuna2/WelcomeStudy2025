@@ -1,0 +1,44 @@
+FROM centos7-php80-base-projectname:latest
+
+ARG ENV_STAGE
+
+COPY conf/production/httpd.conf /etc/httpd/conf/httpd.conf
+COPY conf/production/startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
+COPY webapp /var/www/webapp
+
+WORKDIR /var/www/webapp/
+
+# composer install
+RUN composer install --verbose --no-progress --no-interaction --no-suggest --no-dev
+
+# Install Node
+RUN curl -sL https://rpm.nodesource.com/setup_12.x | bash -
+RUN yum install -y nodejs
+
+# npm install
+RUN npm install
+
+# set up environment
+RUN npm run prod
+
+#  create Laravel.env
+RUN cp .env.${ENV_STAGE} .env && \
+    chown -R 48:48 /var/www/webapp && \
+    php artisan key:generate
+
+# install Root certificate
+RUN mkdir -p /etc/pki/ca-trust/source/anchors/
+RUN cp ./certs/root/g3_pem.crt /etc/pki/ca-trust/source/anchors/g3_pem.crt
+RUN cp ./certs/root/g3.crt /etc/pki/ca-trust/source/anchors/g3.crt
+RUN update-ca-trust enable
+RUN update-ca-trust extract
+
+# Move device certificate
+RUN mkdir -p /etc/httpd/conf/ssl.crt/
+RUN cp ./certs/devid/dpoint-deviceid-${ENV_STAGE}.pem /etc/httpd/conf/ssl.crt/dpoint-deviceid.pem
+
+# php memory limit
+RUN sed -i.bak -e '/^memory_limit =.*/c memory_limit = 1024M' /etc/php.ini
+
+CMD ["/usr/local/bin/startup.sh"]
