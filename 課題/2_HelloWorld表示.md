@@ -19,4 +19,8 @@
 - ブラウザに「Hello Wold」が表示されること
   - 「http://localhost:8082/定義したエンドポイント」をブラウザで検索して表示確認できます。
   
-- 「Hello Wold」はControllerの変数で定義し、viewに変数を渡していること
+- 「Hello Wold」の文字列はControllerの変数で定義し、viewに変数を渡していること
+
+#### イメージ
+
+![](./images/2_hello_world.png)
